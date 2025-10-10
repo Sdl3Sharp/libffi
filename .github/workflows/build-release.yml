@@ -110,8 +110,6 @@ jobs:
       - name: Configure and build (libffi)
         shell: msys2 {0}
         run: |
-          which cl
-          which link
           echo $PATH
 
           ./autogen.sh
