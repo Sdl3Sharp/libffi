@@ -102,6 +102,11 @@ jobs:
       - name: Configure and build (libffi)
         shell: msys2 {0}
         run: |
+          which cl
+          which link
+          echo $PATH
+          cl 2>&1 | head -n 5
+
           ./autogen.sh
 
           echo "=== Configuring for ${{ matrix.build_triple }} ==="
@@ -120,6 +125,11 @@ jobs:
           echo "=== Building ==="
 
           make -j$(nproc)
+
+      - name: Show config.log
+        if: failure()
+        shell: msys2 {0}
+        run: cat config.log || true
 
       # --------------------------------------------------------------
       # 5. Copy built DLL to package dir and mark success
