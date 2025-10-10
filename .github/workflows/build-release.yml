@@ -124,7 +124,8 @@ jobs:
             LD=link \
             CPP="cl -nologo -EP" \
             CXXCPP="cl -nologo -EP" \
-            CPPFLAGS="-DFFI_BUILDING_DLL"
+            CPPFLAGS="-DFFI_BUILDING_DLL" \
+            --disable-static --enable-shared --disable-docs
 
           make -j$(nproc)
 
