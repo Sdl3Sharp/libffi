@@ -102,8 +102,13 @@ jobs:
       - name: Configure and build (libffi)
         shell: msys2 {0}
         run: |
+          # Derive MSVC bin directory from cl
+          msvc_bin="$(dirname "$(which cl)")"
+          # Prepend MSVC bin to PATH so its link is found before /usr/bin/link
+          export PATH="${msvc_bin}:$PATH"
+
           which cl
-          which link.exe
+          which link
           echo $PATH
 
           ./autogen.sh
@@ -115,7 +120,7 @@ jobs:
             --host=${{ matrix.build_triple }} \
             CC="./msvcc.sh ${{ matrix.msvcc_flags }}" \
             CXX="./msvcc.sh ${{ matrix.msvcc_flags }}" \
-            LD=link.exe \
+            LD=link \
             CPP="cl -nologo -EP" \
             CXXCPP="cl -nologo -EP" \
             CPPFLAGS="-DFFI_BUILDING_DLL" \
