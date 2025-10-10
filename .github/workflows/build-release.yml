@@ -102,6 +102,9 @@ jobs:
       - name: Configure and build (libffi)
         shell: msys2 {0}
         run: |
+          # Insert a debug echo after the first line of msvcc.sh
+          sed -i '2i echo "msvcc.sh invoked with: $@" >&2' msvcc.sh
+
           # Ensure MSVC bin is in front
           export PATH="$(cygpath -u "$VCToolsInstallDir/bin/Hostx64/x64"):$PATH"
 
@@ -124,6 +127,18 @@ jobs:
             CPPFLAGS="-DFFI_BUILDING_DLL"
 
           make -j$(nproc)
+
+      - name: Dump config.log on failure
+        if: failure()
+        shell: msys2 {0}
+        run: |
+          echo "=== Showing config.log from build directory ==="
+          if [ -f ${{ matrix.build_triple }}/config.log ]; then
+            cat ${{ matrix.build_triple }}/config.log
+          else
+            echo "config.log not found in ${{ matrix.build_triple }}/"
+            ls -l
+          fi
 
       # --------------------------------------------------------------
       # 6. Copy built DLL to package dir and mark success
