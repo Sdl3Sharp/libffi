@@ -103,7 +103,7 @@ jobs:
         shell: msys2 {0}
         run: |
           which cl
-          which link
+          which link.exe
           echo $PATH
 
           ./autogen.sh
@@ -115,7 +115,7 @@ jobs:
             --host=${{ matrix.build_triple }} \
             CC="./msvcc.sh ${{ matrix.msvcc_flags }}" \
             CXX="./msvcc.sh ${{ matrix.msvcc_flags }}" \
-            LD=link \
+            LD=link.exe \
             CPP="cl -nologo -EP" \
             CXXCPP="cl -nologo -EP" \
             CPPFLAGS="-DFFI_BUILDING_DLL" \
