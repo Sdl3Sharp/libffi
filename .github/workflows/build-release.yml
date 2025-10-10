@@ -111,6 +111,7 @@ jobs:
           type nul > mybuild.sh
           echo "echo 'cl: ' \$(which cl)" >> mybuild.sh
           echo "echo 'link: ' \$(which link)" >> mybuild.sh
+          echo "./autogen.sh" >> mybuild.sh
           echo "./configure \" >> mybuild.sh
           echo "  --build=${{ matrix.build_triple }} \" >> mybuild.sh
           echo "  --host=${{ matrix.build_triple }} \" >> mybuild.sh
