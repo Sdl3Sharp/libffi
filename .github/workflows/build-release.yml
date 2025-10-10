@@ -100,35 +100,31 @@ jobs:
       # 5. Configure & build libffi
       # --------------------------------------------------------------
       - name: Configure and build (libffi)
-        shell: msys2 {0}
+        shell: cmd
         run: |
-          # Derive MSVC bin directory from cl
-          msvc_bin="$(dirname "$(which cl)")"
-          # Prepend MSVC bin to PATH so its link is found before /usr/bin/link
-          export PATH="${msvc_bin}:$PATH"
+          rem Append MSYS2 tools to the end of PATH
+          set PATH=%PATH%;%MSYS2_ROOT%\usr\bin
 
-          which cl
-          which link
-          echo $PATH
+          echo %PATH%
 
-          ./autogen.sh
+          rem Run autogen / configure / make inside from bash
+          "%MSYS2_ROOT%\usr\bin\bash.exe" -lc "
+            echo 'cl: ' \$(which cl)
+            echo 'link: ' \$(which link)
 
-          echo "=== Configuring for ${{ matrix.build_triple }} ==="
+            ./configure \
+              --build=${{ matrix.build_triple }} \
+              --host=${{ matrix.build_triple }} \
+              CC="./msvcc.sh ${{ matrix.msvcc_flags }}" \
+              CXX="./msvcc.sh ${{ matrix.msvcc_flags }}" \
+              LD=link \
+              CPP="cl -nologo -EP" \
+              CXXCPP="cl -nologo -EP" \
+              CPPFLAGS="-DFFI_BUILDING_DLL" \
+              --disable-static --enable-shared --disable-docs
 
-          ./configure \
-            --build=${{ matrix.build_triple }} \
-            --host=${{ matrix.build_triple }} \
-            CC="./msvcc.sh ${{ matrix.msvcc_flags }}" \
-            CXX="./msvcc.sh ${{ matrix.msvcc_flags }}" \
-            LD=link \
-            CPP="cl -nologo -EP" \
-            CXXCPP="cl -nologo -EP" \
-            CPPFLAGS="-DFFI_BUILDING_DLL" \
-            --disable-static --enable-shared --disable-docs
-
-          echo "=== Building ==="
-
-          make -j$(nproc)
+            make -j$(nproc)
+          "
 
       # --------------------------------------------------------------
       # 6. Copy built DLL to package dir and mark success
