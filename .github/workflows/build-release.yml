@@ -44,9 +44,9 @@ jobs:
           # Native x86 build
           # ----------------------------------------------------------
           - rid: win-x86
-            arch: Win32
+            arch: x86
             build_triple: i686-pc-windows-msvc
-            msvcc_flags: ""
+            msvcc_flags: "-m32"
 
           # ----------------------------------------------------------
           # ARM64 build
@@ -106,7 +106,7 @@ jobs:
           sed -i '2i echo "msvcc.sh invoked with: $@" >&2' msvcc.sh
 
           # Ensure MSVC bin is in front
-          export PATH="$(cygpath -u "$VCToolsInstallDir/bin/Hostx64/x64"):$PATH"
+          export PATH="$(cygpath -u "$VCToolsInstallDir/bin/Hostx64/${{ matrix.arch }}"):$PATH"
 
           echo $PATH
 
