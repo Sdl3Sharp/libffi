@@ -84,6 +84,7 @@ jobs:
       # --------------------------------------------------------------
       - name: Setup MSYS2 + Autotools
         uses: msys2/setup-msys2@v2
+        id: msys2
         with:
           path-type: inherit
           update: true
@@ -103,8 +104,9 @@ jobs:
         shell: cmd
         run: |
           rem Append MSYS2 tools to the end of PATH
-          set PATH=%PATH%;%MSYS2_ROOT%\usr\bin
+          set PATH=%PATH%;${{ steps.msys2.outputs.msys2-location }}\usr\bin
 
+          echo %%
           echo %PATH%
 
           rem Construct shell script for bash
@@ -112,19 +114,21 @@ jobs:
           echo "echo 'cl: ' \$(which cl)" >> mybuild.sh
           echo "echo 'link: ' \$(which link)" >> mybuild.sh
           echo "./autogen.sh" >> mybuild.sh
-          echo "./configure \" >> mybuild.sh
-          echo "  --build=${{ matrix.build_triple }} \" >> mybuild.sh
-          echo "  --host=${{ matrix.build_triple }} \" >> mybuild.sh
-          echo "  CC="./msvcc.sh ${{ matrix.msvcc_flags }}" \" >> mybuild.sh
-          echo "  CXX="./msvcc.sh ${{ matrix.msvcc_flags }}" \" >> mybuild.sh
-          echo "  LD=link \" >> mybuild.sh
-          echo "  CPP="cl -nologo -EP" \" >> mybuild.sh
-          echo "  CXXCPP="cl -nologo -EP" \" >> mybuild.sh
-          echo "  CPPFLAGS="-DFFI_BUILDING_DLL" \" >> mybuild.sh
+          echo "./configure \\" >> mybuild.sh
+          echo "  --build=${{ matrix.build_triple }} \\" >> mybuild.sh
+          echo "  --host=${{ matrix.build_triple }} \\" >> mybuild.sh
+          echo "  CC=\"./msvcc.sh ${{ matrix.msvcc_flags }}\" \\" >> mybuild.sh
+          echo "  CXX=\"./msvcc.sh ${{ matrix.msvcc_flags }}\" \\" >> mybuild.sh
+          echo "  LD=link \\" >> mybuild.sh
+          echo "  CPP=\"cl -nologo -EP\" \\" >> mybuild.sh
+          echo "  CXXCPP=\"cl -nologo -EP\" \\" >> mybuild.sh
+          echo "  CPPFLAGS=\"-DFFI_BUILDING_DLL\" \\" >> mybuild.sh
           echo "make -j$(nproc)" >> mybuild.sh
 
+          type mybuild.sh
+
           rem Execute the shell script using bash
-          "%MSYS2_ROOT%\usr\bin\bash.exe" -lc "./mybuild.sh"
+          "${{ steps.msys2.outputs.msys2-location }}\usr\bin\bash.exe" -lc "./mybuild.sh"
 
       # --------------------------------------------------------------
       # 6. Copy built DLL to package dir and mark success
