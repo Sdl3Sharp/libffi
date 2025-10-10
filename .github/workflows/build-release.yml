@@ -119,8 +119,8 @@ jobs:
           ./autogen.sh
           ./configure \
             --build=${{ matrix.build_triple }} \
-            CC="./msvcc.sh --verbose ${{ matrix.msvcc_flags }}" \
-            CXX="./msvcc.sh --verbose ${{ matrix.msvcc_flags }}" \
+            CC="$PWD/msvcc.sh --verbose ${{ matrix.msvcc_flags }}" \
+            CXX="$PWD/msvcc.sh --verbose ${{ matrix.msvcc_flags }}" \
             LD=link \
             CPP="cl -nologo -EP" \
             CXXCPP="cl -nologo -EP" \
