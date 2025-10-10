@@ -112,7 +112,6 @@ jobs:
           ./autogen.sh
           ./configure \
             --build=${{ matrix.build_triple }} \
-            --host=${{ matrix.build_triple }} \
             CC="./msvcc.sh ${{ matrix.msvcc_flags }}" \
             CXX="./msvcc.sh ${{ matrix.msvcc_flags }}" \
             LD=link \
