@@ -85,6 +85,7 @@ jobs:
       - name: Setup MSYS2 + Autotools
         uses: msys2/setup-msys2@v2
         with:
+          path-type: inherit
           update: true
           install: >-
             autoconf
@@ -96,20 +97,13 @@ jobs:
           msystem: MSYS
 
       # --------------------------------------------------------------
-      # 4. Propagate the Visual Studio build environment into MSYS2
-      # --------------------------------------------------------------
-      - name: Propagate MSVC environment into MSYS2
-        run: |
-          echo "PATH=$PATH" >> $GITHUB_ENV
-          echo "INCLUDE=$INCLUDE" >> $GITHUB_ENV
-          echo "LIB=$LIB" >> $GITHUB_ENV
-
-      # --------------------------------------------------------------
       # 5. Configure & build libffi
       # --------------------------------------------------------------
       - name: Configure and build (libffi)
         shell: msys2 {0}
         run: |
+          which cl
+          which link
           echo $PATH
 
           ./autogen.sh
