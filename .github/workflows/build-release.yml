@@ -107,16 +107,11 @@ jobs:
 
           rem Construct shell script for bash
           type nul > mybuild.sh
+          echo which libtoolize >> mybuild.sh
+          echo libtoolize --version >> mybuild.sh
+          echo ls -l /usr/share/libtool >> mybuild.sh
           echo ./autogen.sh >> mybuild.sh
-          echo ./configure \ >> mybuild.sh
-          echo   --build=${{ matrix.build_triple }} \ >> mybuild.sh
-          echo   --host=${{ matrix.build_triple }} \ >> mybuild.sh
-          echo   CC="./msvcc.sh ${{ matrix.msvcc_flags }}" \ >> mybuild.sh
-          echo   CXX="./msvcc.sh ${{ matrix.msvcc_flags }}" \ >> mybuild.sh
-          echo   LD=link \ >> mybuild.sh
-          echo   CPP="cl -nologo -EP" \ >> mybuild.sh
-          echo   CXXCPP="cl -nologo -EP" \ >> mybuild.sh
-          echo   CPPFLAGS="-DFFI_BUILDING_DLL" \ >> mybuild.sh
+          echo ./configure --build=${{ matrix.build_triple }} --host=${{ matrix.build_triple }} CC="./msvcc.sh ${{ matrix.msvcc_flags }}" CXX="./msvcc.sh ${{ matrix.msvcc_flags }}" LD=link CPP="cl -nologo -EP" CXXCPP="cl -nologo -EP" CPPFLAGS="-DFFI_BUILDING_DLL" >> mybuild.sh
           echo make -j$(nproc) >> mybuild.sh
 
           rem Execute the shell script using bash
