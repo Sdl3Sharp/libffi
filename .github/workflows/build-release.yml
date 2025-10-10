@@ -80,18 +80,26 @@ jobs:
           arch: ${{ matrix.arch }}
 
       # --------------------------------------------------------------
-      # 3. Install build tools
+      # 3. Setup MSYS2 environment with Autotools
       # --------------------------------------------------------------
-      - name: Install build dependencies
-        shell: bash
-        run: |
-          pacman -S --noconfirm autoconf automake libtool make || true
+      - name: Setup MSYS2 + Autotools
+        uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: >-
+            autoconf
+            automake
+            libtool
+            make
+            m4
+            git
+          msystem: MSYS
 
       # --------------------------------------------------------------
       # 4. Configure & build libffi
       # --------------------------------------------------------------
       - name: Configure and build (libffi)
-        shell: bash
+        shell: msys2 {0}
         run: |
           ./autogen.sh
 
