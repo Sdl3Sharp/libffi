@@ -44,7 +44,7 @@ jobs:
           # Native x86 build
           # ----------------------------------------------------------
           - rid: win-x86
-            arch: x86
+            arch: Win32
             build_triple: i686-pc-windows-msvc
             msvcc_flags: ""
 
@@ -72,32 +72,40 @@ jobs:
             fetch-depth: 0
 
       # --------------------------------------------------------------
-      # 2. Setup Visual Studio developer environment + Setup MSYS2 environment
+      # 2. Prepare Visual Studio build environment
       # --------------------------------------------------------------
-      - name: Setup build environments
-        uses: cyderize/msvc-msys2@v1
+      - name: Setup MSVC developer shell
+        uses: egor-tensin/vs-shell@v2
         with:
-          use-msvc: true          
+          arch: ${{ matrix.arch }}
+
+      # --------------------------------------------------------------
+      # 3. Setup MSYS2 environment with Autotools
+      # --------------------------------------------------------------
+      - name: Setup MSYS2 + Autotools
+        uses: msys2/setup-msys2@v2
+        with:
           update: true
-        env:
-          VSCMD_ARG_TGT_ARCH: ${{ matrix.arch }}
-
-      # --------------------------------------------------------------
-      # 3. Install Autotools
-      # --------------------------------------------------------------
-      - name: Install Autotools
-        shell: msys2 {0}
-        run: |
-          pacman -S --noconfirm --needed \
-            autoconf \
-            automake \
-            libtool \
-            make \
-            m4 \
+          install: >-
+            autoconf
+            automake
+            libtool
+            make
+            m4
             git
+          msystem: MSYS
 
       # --------------------------------------------------------------
-      # 4. Configure & build libffi
+      # 4. Propagate the Visual Studio build environment into MSYS2
+      # --------------------------------------------------------------
+      - name: Propagate MSVC environment into MSYS2
+        run: |
+          echo "PATH=$PATH" >> $GITHUB_ENV
+          echo "INCLUDE=$INCLUDE" >> $GITHUB_ENV
+          echo "LIB=$LIB" >> $GITHUB_ENV
+
+      # --------------------------------------------------------------
+      # 5. Configure & build libffi
       # --------------------------------------------------------------
       - name: Configure and build (libffi)
         shell: msys2 {0}
@@ -105,7 +113,6 @@ jobs:
           which cl
           which link
           echo $PATH
-          cl 2>&1 | head -n 5
 
           ./autogen.sh
 
@@ -126,13 +133,8 @@ jobs:
 
           make -j$(nproc)
 
-      - name: Show config.log
-        if: failure()
-        shell: msys2 {0}
-        run: cat config.log || true
-
       # --------------------------------------------------------------
-      # 5. Copy built DLL to package dir and mark success
+      # 6. Copy built DLL to package dir and mark success
       # --------------------------------------------------------------
       - name: Copy library and mark success
         run: |
@@ -148,7 +150,7 @@ jobs:
         shell: pwsh
 
       # --------------------------------------------------------------
-      # 6. Upload built binary as artifact
+      # 7. Upload built binary as artifact
       # --------------------------------------------------------------
       - name: Upload artifact (binary)
         if: success() || failure()
@@ -159,7 +161,7 @@ jobs:
           if-no-files-found: ignore
 
       # --------------------------------------------------------------
-      # 7. Upload success marker as artifact
+      # 8. Upload success marker as artifact
       # --------------------------------------------------------------
       - name: Upload artifact (success marker)
         if: success() || failure()
