@@ -107,24 +107,23 @@ jobs:
 
           echo %PATH%
 
-          rem Run autogen / configure / make inside from bash
-          "%MSYS2_ROOT%\usr\bin\bash.exe" -lc "
-            echo 'cl: ' \$(which cl)
-            echo 'link: ' \$(which link)
+          rem Construct shell script for bash
+          type nul > mybuild.sh
+          echo "echo 'cl: ' \$(which cl)" >> mybuild.sh
+          echo "echo 'link: ' \$(which link)" >> mybuild.sh
+          echo "./configure \" >> mybuild.sh
+          echo "  --build=${{ matrix.build_triple }} \" >> mybuild.sh
+          echo "  --host=${{ matrix.build_triple }} \" >> mybuild.sh
+          echo "  CC="./msvcc.sh ${{ matrix.msvcc_flags }}" \" >> mybuild.sh
+          echo "  CXX="./msvcc.sh ${{ matrix.msvcc_flags }}" \" >> mybuild.sh
+          echo "  LD=link \" >> mybuild.sh
+          echo "  CPP="cl -nologo -EP" \" >> mybuild.sh
+          echo "  CXXCPP="cl -nologo -EP" \" >> mybuild.sh
+          echo "  CPPFLAGS="-DFFI_BUILDING_DLL" \" >> mybuild.sh
+          echo "make -j$(nproc)" >> mybuild.sh
 
-            ./configure \
-              --build=${{ matrix.build_triple }} \
-              --host=${{ matrix.build_triple }} \
-              CC="./msvcc.sh ${{ matrix.msvcc_flags }}" \
-              CXX="./msvcc.sh ${{ matrix.msvcc_flags }}" \
-              LD=link \
-              CPP="cl -nologo -EP" \
-              CXXCPP="cl -nologo -EP" \
-              CPPFLAGS="-DFFI_BUILDING_DLL" \
-              --disable-static --enable-shared --disable-docs
-
-            make -j$(nproc)
-          "
+          rem Execute the shell script using bash
+          "%MSYS2_ROOT%\usr\bin\bash.exe" -lc "./mybuild.sh"
 
       # --------------------------------------------------------------
       # 6. Copy built DLL to package dir and mark success
