@@ -44,7 +44,7 @@ jobs:
           # Native x86 build
           # ----------------------------------------------------------
           - rid: win-x86
-            arch: Win32
+            arch: x86
             build_triple: i686-pc-windows-msvc
             msvcc_flags: ""
 
@@ -72,37 +72,36 @@ jobs:
             fetch-depth: 0
 
       # --------------------------------------------------------------
-      # 2. Prepare Visual Studio build environment
+      # 2. Setup Visual Studio developer environment + Setup MSYS2 environment
       # --------------------------------------------------------------
-      - name: Setup MSVC developer shell
-        uses: egor-tensin/vs-shell@v2
+      - name: Setup build environments
+        uses: cyderize/msvc-msys2@v1
         with:
-          arch: ${{ matrix.arch }}
+          use-msvc: true          
+          update: true
+        env:
+          VSCMD_ARG_TGT_ARCH: ${{ matrix.arch }}
 
       # --------------------------------------------------------------
-      # 3. Setup MSYS2 environment with Autotools
+      # 3. Install Autotools
       # --------------------------------------------------------------
-      - name: Setup MSYS2 + Autotools
-        uses: msys2/setup-msys2@v2
-        with:
-          update: true
-          install: >-
-            autoconf
-            automake
-            libtool
-            make
-            m4
+      - name: Install Autotools
+        shell: msys2 {0}
+        run: |
+          pacman -S --noconfirm --needed \
+            autoconf \
+            automake \
+            libtool \
+            make \
+            m4 \
             git
-          msystem: MSYS
 
       # --------------------------------------------------------------
       # 4. Configure & build libffi
       # --------------------------------------------------------------
       - name: Configure and build (libffi)
-        shell: bash
+        shell: msys2 {0}
         run: |
-          export PATH="/c/msys64/usr/bin:$PATH"
-
           ./autogen.sh
 
           echo "=== Configuring for ${{ matrix.build_triple }} ==="
