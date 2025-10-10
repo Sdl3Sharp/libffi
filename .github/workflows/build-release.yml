@@ -84,8 +84,8 @@ jobs:
       # --------------------------------------------------------------
       - name: Setup MSYS2 + Autotools
         uses: msys2/setup-msys2@v2
-        id: msys2
         with:
+          path-type: inherit
           update: true
           install: >-
             autoconf
@@ -100,22 +100,27 @@ jobs:
       # 5. Configure & build libffi
       # --------------------------------------------------------------
       - name: Configure and build (libffi)
-        shell: cmd
+        shell: msys2 {0}
         run: |
-          rem Append MSYS2 tools to the end of PATH
-          set PATH=%PATH%;${{ steps.msys2.outputs.msys2-location }}\usr\bin
+          # Ensure MSVC bin is in front
+          export PATH="$(cygpath -u "$VCToolsInstallDir/bin/Hostx64/x64"):$PATH"
 
-          rem Construct shell script for bash
-          type nul > mybuild.sh
-          echo which libtoolize >> mybuild.sh
-          echo libtoolize --version >> mybuild.sh
-          echo ls -l /usr/share/libtool >> mybuild.sh
-          echo ./autogen.sh >> mybuild.sh
-          echo ./configure --build=${{ matrix.build_triple }} --host=${{ matrix.build_triple }} CC="./msvcc.sh ${{ matrix.msvcc_flags }}" CXX="./msvcc.sh ${{ matrix.msvcc_flags }}" LD=link CPP="cl -nologo -EP" CXXCPP="cl -nologo -EP" CPPFLAGS="-DFFI_BUILDING_DLL" >> mybuild.sh
-          echo make -j$(nproc) >> mybuild.sh
+          echo "cl: $(which cl)"
+          echo "link: $(which link)"
+          echo "libtoolize: $(which libtoolize)"
 
-          rem Execute the shell script using bash
-          "${{ steps.msys2.outputs.msys2-location }}\usr\bin\bash.exe" -c "./mybuild.sh"
+          ./autogen.sh
+          ./configure \
+            --build=${{ matrix.build_triple }} \
+            --host=${{ matrix.build_triple }} \
+            CC="./msvcc.sh ${{ matrix.msvcc_flags }}" \
+            CXX="./msvcc.sh ${{ matrix.msvcc_flags }}" \
+            LD=link \
+            CPP="cl -nologo -EP" \
+            CXXCPP="cl -nologo -EP" \
+            CPPFLAGS="-DFFI_BUILDING_DLL"
+
+          make -j$(nproc)
 
       # --------------------------------------------------------------
       # 6. Copy built DLL to package dir and mark success
