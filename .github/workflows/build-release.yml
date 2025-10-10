@@ -105,15 +105,19 @@ jobs:
           # Ensure MSVC bin is in front
           export PATH="$(cygpath -u "$VCToolsInstallDir/bin/Hostx64/x64"):$PATH"
 
+          echo $PATH
+
           echo "cl: $(which cl)"
           echo "link: $(which link)"
-          echo "libtoolize: $(which libtoolize)"
+          echo "libtoolize: $(which libtoolize)"          
+          echo "awk: $(which awk)"
+          echo "cygpath: $(which cygpath)"
 
           ./autogen.sh
           ./configure \
             --build=${{ matrix.build_triple }} \
-            CC="./msvcc.sh ${{ matrix.msvcc_flags }}" \
-            CXX="./msvcc.sh ${{ matrix.msvcc_flags }}" \
+            CC="./msvcc.sh --verbose ${{ matrix.msvcc_flags }}" \
+            CXX="./msvcc.sh --verbose ${{ matrix.msvcc_flags }}" \
             LD=link \
             CPP="cl -nologo -EP" \
             CXXCPP="cl -nologo -EP" \
