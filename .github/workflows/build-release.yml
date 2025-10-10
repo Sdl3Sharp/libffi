@@ -99,8 +99,10 @@ jobs:
       # 4. Configure & build libffi
       # --------------------------------------------------------------
       - name: Configure and build (libffi)
-        shell: msys2 {0}
+        shell: bash
         run: |
+          export PATH="/c/msys64/usr/bin:$PATH"
+
           ./autogen.sh
 
           echo "=== Configuring for ${{ matrix.build_triple }} ==="
