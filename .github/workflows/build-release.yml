@@ -87,8 +87,8 @@ jobs:
               EOF
               sudo apt-get update
             host_triple: "aarch64-linux-gnu"
-            c_flags: "-marm64"
-            cpp_flags: "-marm64"
+            c_flags: ""
+            cpp_flags: ""
 
           # ----------------------------------------------------------
           # ARM32 (armhf) cross-build
@@ -117,8 +117,8 @@ jobs:
               EOF
               sudo apt-get update
             host_triple: "arm-linux-gnueabihf"
-            c_flags: "-marm"
-            cpp_flags: "-marm"
+            c_flags: ""
+            cpp_flags: ""
 
     env:
       BUILD_TYPE: Release
@@ -172,7 +172,7 @@ jobs:
             --host=${{ matrix.host_triple }} \
             CC=${{ matrix.cc }} \
             CXX=${{ matrix.cxx }} \
-            CFLAGS=${{ matrix.c_flags }}
+            CFLAGS=${{ matrix.c_flags }} \
             CPPFLAGS=${{ matrix.cpp_flags}} \
             --prefix=/usr \
             --disable-static --enable-shared --disable-docs --disable-dependency-tracking
