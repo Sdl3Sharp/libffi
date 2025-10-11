@@ -20,7 +20,180 @@ on:
   repository_dispatch:
     types: [build-release]
 
-jobs: 
+jobs:
+  # ===================================================================
+  # 1. Build (Linux)
+  # ===================================================================
+  build_linux:
+    name: Build ${{ matrix.rid }} (Linux)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ----------------------------------------------------------
+          # Native amd64 build
+          # ----------------------------------------------------------
+          - rid: linux-x64
+            cc: gcc-14
+            cxx: g++-14
+            apt_arch: ""
+            arch_pkgs: ""
+            arch_setup: ""
+            host_triple: "x86_64-pc-linux-gnu"
+            c_flags: "-m64"
+            cpp_flags: "-m64"
+
+          # ----------------------------------------------------------
+          # x86 build on amd64
+          # ----------------------------------------------------------
+          - rid: linux-x86
+            cc: gcc-14
+            cxx: g++-14
+            apt_arch: "i386"
+            arch_pkgs: "gcc-14-multilib g++-14-multilib libc6-dev-i386"
+            arch_setup: |
+              sudo dpkg --add-architecture i386
+              sudo apt-get update
+            host_triple: "i686-pc-linux-gnu"
+            c_flags: "-m32"
+            cpp_flags: "-m32"
+
+          # ----------------------------------------------------------
+          # ARM64 cross-build
+          # ----------------------------------------------------------
+          - rid: linux-arm64
+            cc: aarch64-linux-gnu-gcc-14
+            cxx: aarch64-linux-gnu-g++-14
+            apt_arch: "arm64"
+            arch_pkgs: "gcc-14-aarch64-linux-gnu g++-14-aarch64-linux-gnu libc6-dev-arm64-cross"
+            arch_setup: |
+              sudo dpkg --add-architecture arm64
+              sudo apt-get update
+            host_triple: "aarch64-linux-gnu"
+            c_flags: "-marm64"
+            cpp_flags: "-marm64"
+
+          # ----------------------------------------------------------
+          # ARM32 (armhf) cross-build
+          # ----------------------------------------------------------
+          - rid: linux-arm
+            cc: arm-linux-gnueabihf-gcc-14
+            cxx: arm-linux-gnueabihf-g++-14
+            apt_arch: "armhf"
+            arch_pkgs: "gcc-14-arm-linux-gnueabihf g++-14-arm-linux-gnueabihf libc6-dev-armhf-cross"
+            arch_setup: |
+              sudo dpkg --add-architecture armhf
+              sudo apt-get update
+            host_triple: "arm-linux-gnueabihf"
+            c_flags: "-marm"
+            cpp_flags: "-marm"
+
+    env:
+      BUILD_TYPE: Release
+      PACKAGE_DIR: ${{ github.workspace }}/package
+      SUCCESS_DIR: ${{ github.workspace }}/success
+
+    steps:
+      # --------------------------------------------------------------
+      # 1. Checkout source code
+      # --------------------------------------------------------------
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+            ref: ${{ github.event.inputs.commit_sha || github.event.client_payload.commit_sha || 'main' }}
+            fetch-depth: 0
+
+      # --------------------------------------------------------------
+      # 3. Setup architecture
+      # --------------------------------------------------------------
+      - name: Setup architecture
+        run: ${{ matrix.arch_setup }}
+        shell: bash
+
+      # --------------------------------------------------------------
+      # 5. Install build dependencies
+      # --------------------------------------------------------------
+      - name: Install build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y \
+            build-essential autoconf automake libtool make pkg-config \
+            gcc-14 g++-14 \
+            ${{ matrix.arch_pkgs }}
+
+      # --------------------------------------------------------------
+      # 4. Generate build system files (autogen)
+      # --------------------------------------------------------------
+      - name: Run autogen.sh
+        run: |
+          ./autogen.sh
+
+      # --------------------------------------------------------------
+      # 5. Configure libffi
+      # --------------------------------------------------------------
+      - name: Configure
+        run: |
+          ./configure \
+            --build=x86_64-pc-linux-gnu \
+            --host=${{ matrix.host_triple }} \
+            CC=${{ matrix.cc }} \
+            CXX=${{ matrix.cxx }} \
+            CFLAGS=${{ matrix.c_flags }}
+            CPPFLAGS=${{ matrix.cpp_flags}} \
+            --prefix=/usr \
+            --disable-static --enable-shared --disable-docs --disable-dependency-tracking
+
+      # --------------------------------------------------------------
+      # 6. Build and install into staging directory
+      # --------------------------------------------------------------
+      - name: Build and install
+        run: |
+          make -j$(nproc)
+          make DESTDIR=$PWD/stage install
+
+      # --------------------------------------------------------------
+      # 8. Copy built library to package dir and mark success
+      # --------------------------------------------------------------
+      - name: Copy library and mark success
+        run: |
+          mkdir -p "$PACKAGE_DIR/runtimes/${{ matrix.rid }}/native"
+          libfile=$(find stage -type f -name "libffi.so.*" | sort -V | tail -n 1)
+          if [ -z "$libfile" ]; then
+            libfile=$(find stage -type f -name "libffi.so" | head -n 1)
+          fi
+          if [ -z "$libfile" ]; then
+            echo "WARNING: libffi.so not found for RID ${{ matrix.rid }}. Skipping."
+            exit 0
+          fi
+          cp "$libfile" "$PACKAGE_DIR/runtimes/${{ matrix.rid }}/native/libffi.so"
+          mkdir -p "$SUCCESS_DIR"
+          echo "${{ matrix.rid }}" > "$SUCCESS_DIR/${{ matrix.rid }}.txt"
+
+      # --------------------------------------------------------------
+      # 9. Upload built binary as artifact
+      # --------------------------------------------------------------
+      - name: Upload artifact (binary)
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.rid }}
+          path: package/runtimes/${{ matrix.rid }}
+          if-no-files-found: ignore
+
+      # --------------------------------------------------------------
+      # 10. Upload success marker as artifact
+      # --------------------------------------------------------------
+      - name: Upload artifact (success marker)
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: success-${{ matrix.rid }}
+          path: success/${{ matrix.rid }}.txt
+          if-no-files-found: ignore
+
   # ===================================================================
   # 2. Build (Windows)
   # ===================================================================
@@ -115,7 +288,7 @@ jobs:
             CPP="cl -nologo -EP" \
             CXXCPP="cl -nologo -EP" \
             CPPFLAGS="-DFFI_BUILDING_DLL" \
-            --disable-static --enable-shared --disable-docs
+            --disable-static --enable-shared --disable-docs --disable-dependency-tracking
 
           make -j$(nproc)
 
@@ -130,7 +303,7 @@ jobs:
             Write-Warning "libffi DLL not found for RID ${{ matrix.rid }}. Skipping."
             exit 0
           }
-          Copy-Item $dllFile.FullName "$env:PACKAGE_DIR\runtimes\${{ matrix.rid }}\native\$($dllFile.Name)"
+          Copy-Item $dllFile.FullName "$env:PACKAGE_DIR\runtimes\${{ matrix.rid }}\native\libffi.dll"
           New-Item -ItemType Directory -Force -Path "$env:SUCCESS_DIR" | Out-Null
           "${{ matrix.rid }}" | Out-File -FilePath "$env:SUCCESS_DIR\${{ matrix.rid }}.txt" -Encoding ascii
         shell: pwsh
@@ -163,7 +336,7 @@ jobs:
   package_and_release:
     name: Package all builds and create release
     runs-on: windows-latest
-    needs: [build_windows]
+    needs: [build_linux, build_windows]
     if: always()
     env:
       ARTIFACTS_DIR: ${{ github.workspace }}\artifacts
