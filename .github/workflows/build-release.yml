@@ -97,31 +97,20 @@ jobs:
           msystem: MSYS
 
       # --------------------------------------------------------------
-      # 5. Configure & build libffi
+      # 4. Configure & build libffi
       # --------------------------------------------------------------
       - name: Configure and build (libffi)
         shell: msys2 {0}
         run: |
-          # Insert a debug echo after the first line of msvcc.sh
-          sed -i '2i echo "msvcc.sh invoked with: $@" >&2' msvcc.sh
-
           # Ensure MSVC bin is in front
           export PATH="$(cygpath -u "$VCToolsInstallDir/bin/Hostx64/${{ matrix.arch }}"):$PATH"
-
-          echo $PATH
-
-          echo "cl: $(which cl)"
-          echo "link: $(which link)"
-          echo "libtoolize: $(which libtoolize)"          
-          echo "awk: $(which awk)"
-          echo "cygpath: $(which cygpath)"
 
           ./autogen.sh
           ./configure \
             --build=x86_64-pc-windows-msvc \
             --host=${{ matrix.host_triple }} \
-            CC="$PWD/msvcc.sh --verbose ${{ matrix.msvcc_flags }}" \
-            CXX="$PWD/msvcc.sh --verbose ${{ matrix.msvcc_flags }}" \
+            CC="$PWD/msvcc.sh ${{ matrix.msvcc_flags }}" \
+            CXX="$PWD/msvcc.sh ${{ matrix.msvcc_flags }}" \
             LD=link \
             CPP="cl -nologo -EP" \
             CXXCPP="cl -nologo -EP" \
@@ -130,20 +119,8 @@ jobs:
 
           make -j$(nproc)
 
-      - name: Dump config.log on failure
-        if: failure()
-        shell: msys2 {0}
-        run: |
-          echo "=== Showing config.log from build directory ==="
-          if [ -f ${{ matrix.host_triple }}/config.log ]; then
-            cat ${{ matrix.host_triple }}/config.log
-          else
-            echo "config.log not found in ${{ matrix.host_triple }}/"
-            ls -l
-          fi
-
       # --------------------------------------------------------------
-      # 6. Copy built DLL to package dir and mark success
+      # 5. Copy built DLL to package dir and mark success
       # --------------------------------------------------------------
       - name: Copy library and mark success
         run: |
@@ -159,7 +136,7 @@ jobs:
         shell: pwsh
 
       # --------------------------------------------------------------
-      # 7. Upload built binary as artifact
+      # 6. Upload built binary as artifact
       # --------------------------------------------------------------
       - name: Upload artifact (binary)
         if: success() || failure()
@@ -170,7 +147,7 @@ jobs:
           if-no-files-found: ignore
 
       # --------------------------------------------------------------
-      # 8. Upload success marker as artifact
+      # 7. Upload success marker as artifact
       # --------------------------------------------------------------
       - name: Upload artifact (success marker)
         if: success() || failure()
