@@ -37,7 +37,7 @@ jobs:
           # ----------------------------------------------------------
           - rid: win-x64
             arch: x64
-            build_triple: x86_64-pc-windows-msvc
+            host_triple: x86_64-pc-windows-msvc
             msvcc_flags: "-m64"
 
           # ----------------------------------------------------------
@@ -45,7 +45,7 @@ jobs:
           # ----------------------------------------------------------
           - rid: win-x86
             arch: x86
-            build_triple: i686-pc-windows-msvc
+            host_triple: i686-pc-windows-msvc
             msvcc_flags: "-m32"
 
           # ----------------------------------------------------------
@@ -53,7 +53,7 @@ jobs:
           # ----------------------------------------------------------
           - rid: win-arm64
             arch: arm64
-            build_triple: aarch64-pc-windows-msvc
+            host_triple: aarch64-pc-windows-msvc
             msvcc_flags: "-marm64"
 
     env:
@@ -118,8 +118,8 @@ jobs:
 
           ./autogen.sh
           ./configure \
-            --build=${{ matrix.build_triple }} \
-            --host=${{ matrix.build_triple }} \
+            --build=x86_64-pc-windows-msvc \
+            --host=${{ matrix.host_triple }} \
             CC="$PWD/msvcc.sh --verbose ${{ matrix.msvcc_flags }}" \
             CXX="$PWD/msvcc.sh --verbose ${{ matrix.msvcc_flags }}" \
             LD=link \
@@ -135,10 +135,10 @@ jobs:
         shell: msys2 {0}
         run: |
           echo "=== Showing config.log from build directory ==="
-          if [ -f ${{ matrix.build_triple }}/config.log ]; then
-            cat ${{ matrix.build_triple }}/config.log
+          if [ -f ${{ matrix.host_triple }}/config.log ]; then
+            cat ${{ matrix.host_triple }}/config.log
           else
-            echo "config.log not found in ${{ matrix.build_triple }}/"
+            echo "config.log not found in ${{ matrix.host_triple }}/"
             ls -l
           fi
 
