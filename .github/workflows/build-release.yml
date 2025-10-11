@@ -117,8 +117,8 @@ jobs:
               EOF
               sudo apt-get update
             host_triple: "arm-linux-gnueabihf"
-            c_flags: ""
-            cpp_flags: ""
+            c_flags: "-marm"
+            cpp_flags: "-marm"
 
     env:
       BUILD_TYPE: Release
