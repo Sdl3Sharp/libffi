@@ -489,7 +489,7 @@ jobs:
           if ([string]::IsNullOrEmpty($upstreamCommitSha)) {
             $basedon = "unknown"
           } else {
-            $basedon = "https://github.com//libffi/libffi/commit/$upstreamCommitSha"
+            $basedon = "https://github.com/libffi/libffi/commit/$upstreamCommitSha"
           }
 
           # Gather success markers into a comma-separated list
