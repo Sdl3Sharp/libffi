@@ -562,7 +562,7 @@ jobs:
         if: steps.rids.outputs.count != '0' && (github.event_name == 'repository_dispatch' || github.event.inputs.publish == 'true')
         uses: NuGet/login@v1
         with:
-          user: ${{ secrets.NUGET_TEST_NATIVE_PUBLISH_USER }}
+          user: ${{ secrets.NUGET_USER_NATIVE_TEST }}
 
       # --------------------------------------------------------------
       # 16. Push package to nuget.org
