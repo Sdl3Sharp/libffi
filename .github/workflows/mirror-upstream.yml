@@ -42,13 +42,13 @@ jobs:
       - name: Add upstream and fetch
         run: |
           git remote add upstream https://github.com/libffi/libffi.git
-          git fetch upstream master --tags
 
           TARGET_COMMIT="${{ github.event.inputs.upstream_commit_sha || github.event.client_payload.upstream_commit_sha }}"
           echo "Target upstream commit: $TARGET_COMMIT"
           
           echo "TARGET_COMMIT=$TARGET_COMMIT" >> $GITHUB_ENV
-          
+
+          git fetch upstream "$TARGET_COMMIT"
           git reset --hard "$TARGET_COMMIT"
 
       # ------------------------------------------------------------
