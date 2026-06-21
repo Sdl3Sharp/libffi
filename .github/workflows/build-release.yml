@@ -1,0 +1,538 @@
+name: Build release
+
+permissions:
+  contents: write
+  actions: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: "Commit SHA to build (optional). If empty, builds the current master."
+        required: false
+      version:
+        description: "Version number for release (optional). If empty, a timestamp will be used."
+        required: false
+      upstream_commit_sha:
+        description: "Upstream commit SHA used as base for the build (optional). If empty, defaults to 'unknown'."
+        required: false
+
+  repository_dispatch:
+    types: [build-release]
+
+jobs:
+  # ===================================================================
+  # 1. Build (Linux)
+  # ===================================================================
+  build_linux:
+    name: Build ${{ matrix.rid }} (Linux)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ----------------------------------------------------------
+          # Native amd64 build
+          # ----------------------------------------------------------
+          - rid: linux-x64
+            cc: gcc-14
+            cxx: g++-14
+            apt_arch: ""
+            arch_pkgs: ""
+            arch_setup: ""
+            host_triple: "x86_64-pc-linux-gnu"
+            c_flags: "-m64"
+            cpp_flags: "-m64"
+
+          # ----------------------------------------------------------
+          # x86 build on amd64
+          # ----------------------------------------------------------
+          - rid: linux-x86
+            cc: gcc-14
+            cxx: g++-14
+            apt_arch: "i386"
+            arch_pkgs: "gcc-14-multilib g++-14-multilib libc6-dev-i386"
+            arch_setup: |
+              sudo dpkg --add-architecture i386
+              sudo apt-get update
+            host_triple: "i686-pc-linux-gnu"
+            c_flags: "-m32"
+            cpp_flags: "-m32"
+
+          # ----------------------------------------------------------
+          # ARM64 cross-build
+          # ----------------------------------------------------------
+          - rid: linux-arm64
+            cc: aarch64-linux-gnu-gcc-14
+            cxx: aarch64-linux-gnu-g++-14
+            apt_arch: "arm64"
+            arch_pkgs: "gcc-14-aarch64-linux-gnu g++-14-aarch64-linux-gnu libc6-dev-arm64-cross"
+            arch_setup: |
+              sudo dpkg --add-architecture arm64
+              if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
+                sudo mv /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list.d/ubuntu.sources.disabled
+              fi
+              sudo tee /etc/apt/sources.list >/dev/null <<'EOF'
+              deb [arch=amd64] http://archive.ubuntu.com/ubuntu noble main restricted universe multiverse
+              deb [arch=amd64] http://archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse
+              deb [arch=amd64] http://archive.ubuntu.com/ubuntu noble-backports main restricted universe multiverse
+              deb [arch=amd64] http://security.ubuntu.com/ubuntu noble-security main restricted universe multiverse
+              EOF
+              sudo tee /etc/apt/sources.list.d/arm64.list >/dev/null <<'EOF'
+              deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble main restricted universe multiverse
+              deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-updates main restricted universe multiverse
+              deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-backports main restricted universe multiverse
+              deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-security main restricted universe multiverse
+              EOF
+              sudo apt-get update
+            host_triple: "aarch64-linux-gnu"
+            c_flags: ""
+            cpp_flags: ""
+
+          # ----------------------------------------------------------
+          # ARM32 (armhf) cross-build
+          # ----------------------------------------------------------
+          - rid: linux-arm
+            cc: arm-linux-gnueabihf-gcc-14
+            cxx: arm-linux-gnueabihf-g++-14
+            apt_arch: "armhf"
+            arch_pkgs: "gcc-14-arm-linux-gnueabihf g++-14-arm-linux-gnueabihf libc6-dev-armhf-cross"
+            arch_setup: |
+              sudo dpkg --add-architecture armhf
+              if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
+                sudo mv /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list.d/ubuntu.sources.disabled
+              fi
+              sudo tee /etc/apt/sources.list >/dev/null <<'EOF'
+              deb [arch=amd64] http://archive.ubuntu.com/ubuntu noble main restricted universe multiverse
+              deb [arch=amd64] http://archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse
+              deb [arch=amd64] http://archive.ubuntu.com/ubuntu noble-backports main restricted universe multiverse
+              deb [arch=amd64] http://security.ubuntu.com/ubuntu noble-security main restricted universe multiverse
+              EOF
+              sudo tee /etc/apt/sources.list.d/armhf.list >/dev/null <<'EOF'
+              deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports noble main restricted universe multiverse
+              deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports noble-updates main restricted universe multiverse
+              deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports noble-backports main restricted universe multiverse
+              deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports noble-security main restricted universe multiverse
+              EOF
+              sudo apt-get update
+            host_triple: "arm-linux-gnueabihf"
+            c_flags: "-marm"
+            cpp_flags: "-marm"
+
+    env:
+      BUILD_TYPE: Release
+      PACKAGE_DIR: ${{ github.workspace }}/package
+      SUCCESS_DIR: ${{ github.workspace }}/success
+
+    steps:
+      # --------------------------------------------------------------
+      # 1. Checkout source code
+      # --------------------------------------------------------------
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+            ref: ${{ github.event.inputs.commit_sha || github.event.client_payload.commit_sha || 'master' }}
+            fetch-depth: 0
+
+      # --------------------------------------------------------------
+      # 3. Setup architecture
+      # --------------------------------------------------------------
+      - name: Setup architecture
+        run: ${{ matrix.arch_setup }}
+        shell: bash
+
+      # --------------------------------------------------------------
+      # 5. Install build dependencies
+      # --------------------------------------------------------------
+      - name: Install build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y \
+            build-essential autoconf automake libltdl-dev libtool libtool-bin make m4 pkg-config \
+            gcc-14 g++-14 \
+            ${{ matrix.arch_pkgs }}
+
+      # --------------------------------------------------------------
+      # 4. Generate build system files (autogen)
+      # --------------------------------------------------------------
+      - name: Run autogen.sh
+        run: |
+          export ACLOCAL_PATH=/usr/share/aclocal
+          ./autogen.sh
+
+      # --------------------------------------------------------------
+      # 5. Configure libffi
+      # --------------------------------------------------------------
+      - name: Configure
+        run: |
+          ./configure \
+            --build=x86_64-pc-linux-gnu \
+            --host=${{ matrix.host_triple }} \
+            CC=${{ matrix.cc }} \
+            CXX=${{ matrix.cxx }} \
+            CFLAGS=${{ matrix.c_flags }} \
+            CPPFLAGS=${{ matrix.cpp_flags}} \
+            --prefix=/usr \
+            --disable-static --enable-shared --disable-docs --disable-dependency-tracking
+
+      # --------------------------------------------------------------
+      # 6. Build and install into staging directory
+      # --------------------------------------------------------------
+      - name: Build and install
+        run: |
+          make -j$(nproc)
+          make DESTDIR=$PWD/stage install
+
+      # --------------------------------------------------------------
+      # 8. Copy built library to package dir and mark success
+      # --------------------------------------------------------------
+      - name: Copy library and mark success
+        run: |
+          mkdir -p "$PACKAGE_DIR/runtimes/${{ matrix.rid }}/native"
+          libfile=$(find stage -type f -name "libffi.so.*" | sort -V | tail -n 1)
+          if [ -z "$libfile" ]; then
+            libfile=$(find stage -type f -name "libffi.so" | head -n 1)
+          fi
+          if [ -z "$libfile" ]; then
+            echo "WARNING: libffi.so not found for RID ${{ matrix.rid }}. Skipping."
+            exit 0
+          fi
+          cp "$libfile" "$PACKAGE_DIR/runtimes/${{ matrix.rid }}/native/libffi.so"
+          mkdir -p "$SUCCESS_DIR"
+          echo "${{ matrix.rid }}" > "$SUCCESS_DIR/${{ matrix.rid }}.txt"
+
+      # --------------------------------------------------------------
+      # 9. Upload built binary as artifact
+      # --------------------------------------------------------------
+      - name: Upload artifact (binary)
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.rid }}
+          path: package/runtimes/${{ matrix.rid }}
+          if-no-files-found: ignore
+
+      # --------------------------------------------------------------
+      # 10. Upload success marker as artifact
+      # --------------------------------------------------------------
+      - name: Upload artifact (success marker)
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: success-${{ matrix.rid }}
+          path: success/${{ matrix.rid }}.txt
+          if-no-files-found: ignore
+
+  # ===================================================================
+  # 2. Build (Windows)
+  # ===================================================================
+  build_windows:
+    name: Build ${{ matrix.rid }} (Windows)
+    runs-on: windows-latest
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ----------------------------------------------------------
+          # Native x64 build
+          # ----------------------------------------------------------
+          - rid: win-x64
+            arch: x64
+            host_triple: x86_64-pc-windows-msvc
+            msvcc_flags: "-m64"
+
+          # ----------------------------------------------------------
+          # Native x86 build
+          # ----------------------------------------------------------
+          - rid: win-x86
+            arch: x86
+            host_triple: i686-pc-windows-msvc
+            msvcc_flags: "-m32"
+
+          # ----------------------------------------------------------
+          # ARM64 build
+          # ----------------------------------------------------------
+          - rid: win-arm64
+            arch: arm64
+            host_triple: aarch64-pc-windows-msvc
+            msvcc_flags: "-marm64"
+
+    env:
+      BUILD_TYPE: Release
+      PACKAGE_DIR: ${{ github.workspace }}\package
+      SUCCESS_DIR: ${{ github.workspace }}\success
+
+    steps:
+      # --------------------------------------------------------------
+      # 1. Checkout source code
+      # --------------------------------------------------------------
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+            ref: ${{ github.event.inputs.commit_sha || github.event.client_payload.commit_sha || 'master' }}
+            fetch-depth: 0
+
+      # --------------------------------------------------------------
+      # 2. Prepare Visual Studio build environment
+      # --------------------------------------------------------------
+      - name: Setup MSVC developer shell
+        uses: egor-tensin/vs-shell@v2
+        with:
+          arch: ${{ matrix.arch }}
+
+      # --------------------------------------------------------------
+      # 3. Setup MSYS2 environment with Autotools
+      # --------------------------------------------------------------
+      - name: Setup MSYS2 + Autotools
+        uses: msys2/setup-msys2@v2
+        with:
+          path-type: inherit
+          update: true
+          install: >-
+            autoconf
+            automake
+            libtool
+            make
+            m4
+            git
+          msystem: MSYS
+
+      # --------------------------------------------------------------
+      # 4. Configure & build libffi
+      # --------------------------------------------------------------
+      - name: Configure and build (libffi)
+        shell: msys2 {0}
+        run: |
+          # Ensure MSVC bin is in front
+          export PATH="$(cygpath -u "$VCToolsInstallDir/bin/Hostx64/${{ matrix.arch }}"):$PATH"
+
+          ./autogen.sh
+          ./configure \
+            --build=x86_64-pc-windows-msvc \
+            --host=${{ matrix.host_triple }} \
+            CC="$PWD/msvcc.sh ${{ matrix.msvcc_flags }}" \
+            CXX="$PWD/msvcc.sh ${{ matrix.msvcc_flags }}" \
+            LD=link \
+            CPP="cl -nologo -EP" \
+            CXXCPP="cl -nologo -EP" \
+            CPPFLAGS="-DFFI_BUILDING_DLL" \
+            --disable-static --enable-shared --disable-docs --disable-dependency-tracking
+
+          make -j$(nproc)
+
+      # --------------------------------------------------------------
+      # 5. Copy built DLL to package dir and mark success
+      # --------------------------------------------------------------
+      - name: Copy library and mark success
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:PACKAGE_DIR\runtimes\${{ matrix.rid }}\native" | Out-Null
+          $dllFile = Get-ChildItem -Path . -Recurse -Filter "*.dll" | Where-Object { $_.FullName -match '\\.libs\\' } | Select-Object -First 1
+          if (-not $dllFile) {
+            Write-Warning "libffi DLL not found for RID ${{ matrix.rid }}. Skipping."
+            exit 0
+          }
+          Copy-Item $dllFile.FullName "$env:PACKAGE_DIR\runtimes\${{ matrix.rid }}\native\libffi.dll"
+          New-Item -ItemType Directory -Force -Path "$env:SUCCESS_DIR" | Out-Null
+          "${{ matrix.rid }}" | Out-File -FilePath "$env:SUCCESS_DIR\${{ matrix.rid }}.txt" -Encoding ascii
+        shell: pwsh
+
+      # --------------------------------------------------------------
+      # 6. Upload built binary as artifact
+      # --------------------------------------------------------------
+      - name: Upload artifact (binary)
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.rid }}
+          path: package/runtimes/${{ matrix.rid }}
+          if-no-files-found: ignore
+
+      # --------------------------------------------------------------
+      # 7. Upload success marker as artifact
+      # --------------------------------------------------------------
+      - name: Upload artifact (success marker)
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: success-${{ matrix.rid }}
+          path: success/${{ matrix.rid }}.txt
+          if-no-files-found: ignore
+
+  # ===================================================================
+  # 3. Package & Release (Linux + Windows)
+  # ===================================================================
+  package_and_release:
+    name: Package all builds and create release
+    runs-on: windows-latest
+    needs: [build_linux, build_windows]
+    if: always()
+    env:
+      ARTIFACTS_DIR: ${{ github.workspace }}\artifacts
+
+    steps:
+      # --------------------------------------------------------------
+      # 1. Download all artifacts from both build jobs
+      # --------------------------------------------------------------
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts_download
+
+      # --------------------------------------------------------------
+      # 2. Create combined runtimes folder
+      # --------------------------------------------------------------
+      # Each artifact folder is named after its RID and contains:
+      #   native/<library file>
+      # We create runtimes/<rid>/native/ and copy the native folder in.
+      # --------------------------------------------------------------
+      - name: Create combined runtimes folder
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "runtimes" | Out-Null
+          Get-ChildItem -Path "artifacts_download" -Directory | ForEach-Object {
+            $rid = $_.Name
+            if (Test-Path "$($_.FullName)\native") {
+              New-Item -ItemType Directory -Force -Path "runtimes\$rid" | Out-Null
+              Copy-Item -Recurse -Force "$($_.FullName)\native" "runtimes\$rid\"
+            }
+          }
+
+      # --------------------------------------------------------------
+      # 3. Zip the combined runtimes folder
+      # --------------------------------------------------------------
+      - name: Create combined zip
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:ARTIFACTS_DIR" | Out-Null
+          Compress-Archive -Path "runtimes" -DestinationPath "$env:ARTIFACTS_DIR\runtimes.zip" -Force
+      
+      # --------------------------------------------------------------
+      # 4. Fetch license file and SPDX id via GitHub API
+      # --------------------------------------------------------------
+      - name: Fetch license metadata via GitHub API
+        id: license
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $repo = "${{ github.repository }}"
+          try {
+            $licenseJson = gh api repos/$repo/license | ConvertFrom-Json
+          } catch {
+            Write-Warning "No license information available for this repo."
+            Add-Content -Path $env:GITHUB_OUTPUT -Value "license_file="
+            Add-Content -Path $env:GITHUB_OUTPUT -Value "spdx="
+            exit 0
+          }
+
+          # Ensure artifacts dir exists
+          New-Item -ItemType Directory -Force -Path "$env:ARTIFACTS_DIR" | Out-Null
+
+          # Defensive: pick filename
+          $licenseFileName = $licenseJson.name
+          if (-not $licenseFileName -or [string]::IsNullOrWhiteSpace($licenseFileName)) {
+            $licenseFileName = "LICENSE"
+            Write-Warning "License JSON did not contain a valid 'name'. Falling back to $licenseFileName"
+          }
+
+          # Defensive: check download_url
+          if ($licenseJson.download_url -and -not [string]::IsNullOrWhiteSpace($licenseJson.download_url)) {
+            Write-Host "Downloading license from $($licenseJson.download_url)"
+            try {
+              Invoke-WebRequest -Uri $licenseJson.download_url -OutFile "$env:ARTIFACTS_DIR\$licenseFileName"
+            } catch {
+              Write-Warning "Failed to download license file from $($licenseJson.download_url)"
+            }
+            if (Test-Path "$env:ARTIFACTS_DIR\$licenseFileName") {
+              Write-Host "License file written as $licenseFileName"
+              Add-Content -Path $env:GITHUB_OUTPUT -Value "license_file=$licenseFileName"
+            } else {
+              Write-Warning "LICENSE file was not created!"
+              Add-Content -Path $env:GITHUB_OUTPUT -Value "license_file="
+            }
+          } else {
+            Write-Warning "No download_url in license response."
+            Add-Content -Path $env:GITHUB_OUTPUT -Value "license_file="
+          }
+
+          # Defensive: check SPDX id
+          if ($licenseJson.license -and $licenseJson.license.spdx_id -and $licenseJson.license.spdx_id -ne "NOASSERTION") {
+            $spdx = $licenseJson.license.spdx_id            
+            $spdxClean = $spdx.Trim()
+            Write-Host "SPDX id: $spdxClean"
+            $spdxClean | Out-File -FilePath "$env:ARTIFACTS_DIR\LICENSE.spdx" -Encoding ascii -NoNewline
+            Add-Content -Path $env:GITHUB_OUTPUT -Value "spdx=$spdxClean"
+          } else {
+            Write-Host "No valid SPDX id found."
+            Add-Content -Path $env:GITHUB_OUTPUT -Value "spdx="
+          }
+
+      # --------------------------------------------------------------
+      # 5. Gather release information
+      # --------------------------------------------------------------
+      - name: Gather release information
+        id: gather
+        shell: pwsh
+        run: |
+          # Version comes from workflow inputs or repository_dispatch payload; fallback to timestamp
+          if ([string]::IsNullOrEmpty("${{ github.event.inputs.version || github.event.client_payload.version }}")) {
+            $version = (Get-Date -Format "yyyyMMdd-HHmmss")
+          } else {
+            $version = "${{ github.event.inputs.version || github.event.client_payload.version }}"
+          }
+
+          # Based-on line: produce either the URL or 'unknown' (without a trailing commit segment)
+          $upstreamCommitSha = "${{ github.event.inputs.upstream_commit_sha || github.event.client_payload.upstream_commit_sha }}"
+          if ([string]::IsNullOrEmpty($upstreamCommitSha)) {
+            $basedon = "unknown"
+          } else {
+            $basedon = "https://github.com/libffi/libffi/commit/$upstreamCommitSha"
+          }
+
+          # Gather success markers into a comma-separated list
+          $successFiles = Get-ChildItem -Path "artifacts_download" -Recurse -Filter "*.txt"
+          if ($successFiles.Count -eq 0) {
+            $ridlist = "None"
+          } else {
+            $ridlist = ($successFiles | Get-Content) -join ", "
+          }
+
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "version=$version"
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "basedon=$basedon"
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "ridlist=$ridlist"
+          
+          if ($ridlist -eq "None") { exit 1 }
+
+      # --------------------------------------------------------------
+      # 6. Create or update the GitHub release
+      # --------------------------------------------------------------
+      - name: Create or update release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.gather.outputs.version }}
+          name: ${{ steps.gather.outputs.version }}
+          body: |
+            Based on: ${{ steps.gather.outputs.basedon }}
+            Included runtimes: ${{ steps.gather.outputs.ridlist }}
+            ${{ steps.license.outputs.spdx && format('License: {0}', steps.license.outputs.spdx) || '' }}
+          files: |
+            ${{ env.ARTIFACTS_DIR }}/runtimes.zip
+            ${{ env.ARTIFACTS_DIR }}/${{ steps.license.outputs.license_file }}
+            ${{ env.ARTIFACTS_DIR }}/LICENSE.spdx
+
+      # --------------------------------------------------------------
+      # 7. Trigger pack-nuget-test-package
+      # --------------------------------------------------------------
+      - name: Trigger pack-nuget-test-package
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.WORKFLOW_TRIGGER_PAT }}
+          repository: ${{ github.repository }}
+          event-type: pack-nuget-test-package
+          client-payload: |
+            {
+              "tag": "v${{ steps.gather.outputs.version }}"
+            }
