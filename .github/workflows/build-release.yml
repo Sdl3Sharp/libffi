@@ -36,8 +36,8 @@ jobs:
           # Native amd64 build
           # ----------------------------------------------------------
           - rid: linux-x64
-            cc: gcc-14
-            cxx: g++-14
+            cc: gcc-15
+            cxx: g++-15
             apt_arch: ""
             arch_pkgs: ""
             arch_setup: ""
@@ -49,10 +49,10 @@ jobs:
           # x86 build on amd64
           # ----------------------------------------------------------
           - rid: linux-x86
-            cc: gcc-14
-            cxx: g++-14
+            cc: gcc-15
+            cxx: g++-15
             apt_arch: "i386"
-            arch_pkgs: "gcc-14-multilib g++-14-multilib libc6-dev-i386"
+            arch_pkgs: "gcc-15-multilib g++-15-multilib libc6-dev-i386"
             arch_setup: |
               sudo dpkg --add-architecture i386
               sudo apt-get update
@@ -64,26 +64,26 @@ jobs:
           # ARM64 cross-build
           # ----------------------------------------------------------
           - rid: linux-arm64
-            cc: aarch64-linux-gnu-gcc-14
-            cxx: aarch64-linux-gnu-g++-14
+            cc: aarch64-linux-gnu-gcc-15
+            cxx: aarch64-linux-gnu-g++-15
             apt_arch: "arm64"
-            arch_pkgs: "gcc-14-aarch64-linux-gnu g++-14-aarch64-linux-gnu libc6-dev-arm64-cross"
+            arch_pkgs: "gcc-15-aarch64-linux-gnu g++-15-aarch64-linux-gnu libc6-dev-arm64-cross"
             arch_setup: |
               sudo dpkg --add-architecture arm64
               if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
                 sudo mv /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list.d/ubuntu.sources.disabled
               fi
               sudo tee /etc/apt/sources.list >/dev/null <<'EOF'
-              deb [arch=amd64] http://archive.ubuntu.com/ubuntu noble main restricted universe multiverse
-              deb [arch=amd64] http://archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse
-              deb [arch=amd64] http://archive.ubuntu.com/ubuntu noble-backports main restricted universe multiverse
-              deb [arch=amd64] http://security.ubuntu.com/ubuntu noble-security main restricted universe multiverse
+              deb [arch=amd64] http://archive.ubuntu.com/ubuntu resolute main restricted universe multiverse
+              deb [arch=amd64] http://archive.ubuntu.com/ubuntu resolute-updates main restricted universe multiverse
+              deb [arch=amd64] http://archive.ubuntu.com/ubuntu resolute-backports main restricted universe multiverse
+              deb [arch=amd64] http://security.ubuntu.com/ubuntu resolute-security main restricted universe multiverse
               EOF
               sudo tee /etc/apt/sources.list.d/arm64.list >/dev/null <<'EOF'
-              deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble main restricted universe multiverse
-              deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-updates main restricted universe multiverse
-              deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-backports main restricted universe multiverse
-              deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-security main restricted universe multiverse
+              deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports resolute main restricted universe multiverse
+              deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports resolute-updates main restricted universe multiverse
+              deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports resolute-backports main restricted universe multiverse
+              deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports resolute-security main restricted universe multiverse
               EOF
               sudo apt-get update
             host_triple: "aarch64-linux-gnu"
@@ -94,26 +94,26 @@ jobs:
           # ARM32 (armhf) cross-build
           # ----------------------------------------------------------
           - rid: linux-arm
-            cc: arm-linux-gnueabihf-gcc-14
-            cxx: arm-linux-gnueabihf-g++-14
+            cc: arm-linux-gnueabihf-gcc-15
+            cxx: arm-linux-gnueabihf-g++-15
             apt_arch: "armhf"
-            arch_pkgs: "gcc-14-arm-linux-gnueabihf g++-14-arm-linux-gnueabihf libc6-dev-armhf-cross"
+            arch_pkgs: "gcc-15-arm-linux-gnueabihf g++-15-arm-linux-gnueabihf libc6-dev-armhf-cross"
             arch_setup: |
               sudo dpkg --add-architecture armhf
               if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
                 sudo mv /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list.d/ubuntu.sources.disabled
               fi
               sudo tee /etc/apt/sources.list >/dev/null <<'EOF'
-              deb [arch=amd64] http://archive.ubuntu.com/ubuntu noble main restricted universe multiverse
-              deb [arch=amd64] http://archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse
-              deb [arch=amd64] http://archive.ubuntu.com/ubuntu noble-backports main restricted universe multiverse
-              deb [arch=amd64] http://security.ubuntu.com/ubuntu noble-security main restricted universe multiverse
+              deb [arch=amd64] http://archive.ubuntu.com/ubuntu resolute main restricted universe multiverse
+              deb [arch=amd64] http://archive.ubuntu.com/ubuntu resolute-updates main restricted universe multiverse
+              deb [arch=amd64] http://archive.ubuntu.com/ubuntu resolute-backports main restricted universe multiverse
+              deb [arch=amd64] http://security.ubuntu.com/ubuntu resolute-security main restricted universe multiverse
               EOF
               sudo tee /etc/apt/sources.list.d/armhf.list >/dev/null <<'EOF'
-              deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports noble main restricted universe multiverse
-              deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports noble-updates main restricted universe multiverse
-              deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports noble-backports main restricted universe multiverse
-              deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports noble-security main restricted universe multiverse
+              deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports resolute main restricted universe multiverse
+              deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports resolute-updates main restricted universe multiverse
+              deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports resolute-backports main restricted universe multiverse
+              deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports resolute-security main restricted universe multiverse
               EOF
               sudo apt-get update
             host_triple: "arm-linux-gnueabihf"
@@ -151,7 +151,7 @@ jobs:
           set -euo pipefail
           sudo apt-get install -y \
             build-essential autoconf automake libltdl-dev libtool libtool-bin make m4 pkg-config \
-            gcc-14 g++-14 \
+            gcc-15 g++-15 \
             ${{ matrix.arch_pkgs }}
 
       # --------------------------------------------------------------
