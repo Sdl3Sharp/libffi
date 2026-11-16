@@ -36,8 +36,8 @@ jobs:
           # Native amd64 build
           # ----------------------------------------------------------
           - rid: linux-x64
-            cc: gcc-15
-            cxx: g++-15
+            cc: gcc-16
+            cxx: g++-16
             apt_arch: ""
             arch_pkgs: ""
             arch_setup: ""
@@ -49,10 +49,10 @@ jobs:
           # x86 build on amd64
           # ----------------------------------------------------------
           - rid: linux-x86
-            cc: gcc-15
-            cxx: g++-15
+            cc: gcc-16
+            cxx: g++-16
             apt_arch: "i386"
-            arch_pkgs: "gcc-15-multilib g++-15-multilib libc6-dev-i386"
+            arch_pkgs: "gcc-16-multilib g++-16-multilib libc6-dev-i386"
             arch_setup: |
               sudo dpkg --add-architecture i386
               sudo apt-get update
@@ -64,10 +64,10 @@ jobs:
           # ARM64 cross-build
           # ----------------------------------------------------------
           - rid: linux-arm64
-            cc: aarch64-linux-gnu-gcc-15
-            cxx: aarch64-linux-gnu-g++-15
+            cc: aarch64-linux-gnu-gcc-16
+            cxx: aarch64-linux-gnu-g++-16
             apt_arch: "arm64"
-            arch_pkgs: "gcc-15-aarch64-linux-gnu g++-15-aarch64-linux-gnu libc6-dev-arm64-cross"
+            arch_pkgs: "gcc-16-aarch64-linux-gnu g++-16-aarch64-linux-gnu libc6-dev-arm64-cross"
             arch_setup: |
               sudo dpkg --add-architecture arm64
               if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
@@ -94,10 +94,10 @@ jobs:
           # ARM32 (armhf) cross-build
           # ----------------------------------------------------------
           - rid: linux-arm
-            cc: arm-linux-gnueabihf-gcc-15
-            cxx: arm-linux-gnueabihf-g++-15
+            cc: arm-linux-gnueabihf-gcc-16
+            cxx: arm-linux-gnueabihf-g++-16
             apt_arch: "armhf"
-            arch_pkgs: "gcc-15-arm-linux-gnueabihf g++-15-arm-linux-gnueabihf libc6-dev-armhf-cross"
+            arch_pkgs: "gcc-16-arm-linux-gnueabihf g++-16-arm-linux-gnueabihf libc6-dev-armhf-cross"
             arch_setup: |
               sudo dpkg --add-architecture armhf
               if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
@@ -151,7 +151,7 @@ jobs:
           set -euo pipefail
           sudo apt-get install -y \
             build-essential autoconf automake libltdl-dev libtool libtool-bin make m4 pkg-config \
-            gcc-15 g++-15 \
+            gcc-16 g++-16 \
             ${{ matrix.arch_pkgs }}
 
       # --------------------------------------------------------------
